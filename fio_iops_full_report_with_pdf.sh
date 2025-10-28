@@ -2,8 +2,9 @@
 # =====================================================================
 # FIO IOPS + THROUGHPUT REPORT (with charts → PDF/HTML)
 # Runs: randread, randwrite, randrw (4k), read, write (1M)
-# Outputs: per-test JSON/TXT, PNG charts, a polished PDF/HTML report
+# Outputs: per-test JSON/TXT, PNG charts, and a polished PDF/HTML report
 # Robust jq (jq-1.5 compatible), correct latency parsing, safe resource-path
+# Headless charts + ASCII-safe system info for perfect PDF alignment
 # =====================================================================
 set -euo pipefail
 
@@ -59,8 +60,13 @@ SYSINFO_TXT="$LOG_DIR/system_info.txt"
   echo "=== Memory (free -h) ==="
   (command -v free >/dev/null && free -h) || echo "free not available"
   echo
-  echo "=== Block Devices (lsblk -o) ==="
-  (command -v lsblk >/dev/null && lsblk -o NAME,MODEL,SIZE,ROTA,TYPE,MOUNTPOINTS) || echo "lsblk not available"
+  echo "=== Block Devices (ASCII list) ==="
+  if command -v lsblk >/dev/null; then
+    # ASCII-safe (no box-drawing glyphs)
+    lsblk -l -o NAME,MODEL,SIZE,ROTA,TYPE,MOUNTPOINTS
+  else
+    echo "lsblk not available"
+  fi
 } > "$SYSINFO_TXT"
 
 echo "============================================================"
@@ -194,7 +200,13 @@ CHART_MD=""
 if [[ "$PY_OK" -eq 1 ]]; then
   CHART_PY="$LOG_DIR/make_charts.py"
   cat > "$CHART_PY" << 'PYCODE'
-import glob, os, pandas as pd, matplotlib.pyplot as plt
+import os
+# Force headless (no X11) for perfect server-side rendering
+os.environ["MPLBACKEND"] = "Agg"
+
+import glob, pandas as pd, matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
 
 outdir = os.path.dirname(__file__)
 tests = ["random-read","random-write","mixed-rw","seq-read","seq-write"]
@@ -246,12 +258,14 @@ for t in tests:
   bw = read_fio_logs(base, "bw")
   if bw is not None:
     png = os.path.join(outdir, f"{t}_bw.png")
+    # KB/s → MB/s
     save_line(bw["s"], bw["val"]/1024.0, f"{t} — Bandwidth over time", "MB/s", png)
     md_lines.append(f"![{t} Bandwidth]({os.path.basename(png)}){{ width=95% }}")
 
   lat = read_fio_logs(base, "lat")
   if lat is not None:
     png = os.path.join(outdir, f"{t}_lat.png")
+    # usec → ms
     save_line(lat["s"], lat["val"]/1000.0, f"{t} — Latency over time", "Latency (ms)", png)
     md_lines.append(f"![{t} Latency]({os.path.basename(png)}){{ width=95% }}")
 
