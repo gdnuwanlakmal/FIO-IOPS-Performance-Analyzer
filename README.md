@@ -33,9 +33,11 @@ It performs five standardized tests using fio
 Install all required tools once:
 ```shell
 sudo apt update
-sudo apt install -y fio jq pandoc texlive-latex-base texlive-fonts-recommended \
-  texlive-fonts-extra texlive-latex-extra texlive-xetex python3 python3-pip
+sudo apt install -y fio jq pandoc \
+  texlive-latex-base texlive-fonts-recommended texlive-fonts-extra texlive-latex-extra texlive-xetex \
+  python3 python3-pip
 python3 -m pip install --break-system-packages pandas matplotlib
+
 ```
 ## 🚀 Usage
 Clone the repo and run the benchmark:
